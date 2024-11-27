@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Price Analysis</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .layout-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .input-section {
+            flex: 1;
+        }
+        .highlights-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .highlights-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .highlights-table th, .highlights-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .highlights-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .highlights-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .highlights-header {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 1.2em;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .results {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: white;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            cursor: pointer;
+        }
+        th:hover {
+            background-color: #e9ecef;
+        }
+        th::after {
+            content: '↕️';
+            font-size: 12px;
+            margin-left: 5px;
+            opacity: 0.5;
+        }
+        th.asc::after {
+            content: '↑';
+            opacity: 1;
+        }
+        th.desc::after {
+            content: '↓';
+            opacity: 1;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        tr.call-row {
+            background-color: rgba(40, 167, 69, 0.05);
+        }
+        tr.put-row {
+            background-color: rgba(220, 53, 69, 0.05);
+        }
+        .summary {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .expiry-section {
+            margin-top: 30px;
+            border-top: 2px solid #007bff;
+            padding-top: 15px;
+        }
+        .expiry-header {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #007bff;
+        }
+        .positive {
+            color: #28a745;
+        }
+        .negative {
+            color: #dc3545;
+        }
+        .neutral {
+            color: #6c757d;
+        }
+        .option-type {
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .option-type.call {
+            color: #28a745;
+        }
+        .option-type.put {
+            color: #dc3545;
+        }
+        .scenario-section {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Options Price Analysis</h1>
+        
+        <div class="form-group">
+            <label for="ticker">Stock Ticker:</label>
+            <input type="text" id="ticker" value="AAPL">
+        </div>
+        <div class="form-group">
+            <label for="minChange">Minimum Price Change (%):</label>
+            <input type="number" id="minChange" value="-10">
+        </div>
+        <div class="form-group">
+            <label for="maxChange">Maximum Price Change (%):</label>
+            <input type="number" id="maxChange" value="10">
+        </div>
+        <div class="form-group">
+            <label for="stepSize">Step Size (%):</label>
+            <input type="number" id="stepSize" value="5">
+        </div>
+        <div class="form-group">
+            <label for="maxExpiry">Number of Expiration Dates:</label>
+            <input type="number" id="maxExpiry" value="3" min="1" max="10">
+        </div>
+        <button onclick="analyzeOptions()">Analyze Options</button>
+
+        <div class="highlights-section">
+            <h2>Options Highlights</h2>
+            <div class="row">
+                <div class="col">
+                    <h3>Highest Profit Potential</h3>
+                    <table class="highlights-table" id="profitTable">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Strike</th>
+                                <th>Expiry</th>
+                                <th>Price</th>
+                                <th>Profit %</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="col">
+                    <h3>Best Value (Profit/Cost)</h3>
+                    <table class="highlights-table" id="valueTable">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Strike</th>
+                                <th>Expiry</th>
+                                <th>Price</th>
+                                <th>Value Ratio</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="results" id="results">
+            <div id="summary" class="summary"></div>
+            <div id="tableResults"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variable to store the current data
+        let currentData = null;
+
+        async function analyzeOptions() {
+            const ticker = document.getElementById('ticker').value.trim().toUpperCase();
+            if (!ticker) {
+                alert('Please enter a ticker symbol');
+                return;
+            }
+
+            // Get other parameters with default values if not specified
+            const minChange = parseFloat(document.getElementById('minChange').value) || -10;
+            const maxChange = parseFloat(document.getElementById('maxChange').value) || 10;
+            const stepSize = parseFloat(document.getElementById('stepSize').value) || 5;
+            const maxExpiry = parseInt(document.getElementById('maxExpiry').value) || 3;
+
+            try {
+                const response = await fetch('http://localhost:8000/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ticker: ticker,
+                        min_change: minChange,
+                        max_change: maxChange,
+                        step_size: stepSize,
+                        max_expiry_count: maxExpiry
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Raw data from server:', data);
+
+                // First update the highlights tables
+                // updateHighlightsTables(data);
+
+                // Then display the main results
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to analyze options: ' + error.message);
+            }
+        }
+
+        function formatNumber(num, decimals = 2) {
+            return num ? Number(num).toFixed(decimals) : '0.00';
+        }
+
+        function getColorClass(value) {
+            if (value > 0) return 'positive';
+            if (value < 0) return 'negative';
+            return 'neutral';
+        }
+
+        function sortTable(table, columnIndex, asc = true) {
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const headers = table.querySelectorAll('th');
+
+            // Remove sorting indicators from all headers
+            headers.forEach(header => {
+                header.classList.remove('asc', 'desc');
+            });
+
+            // Add sorting indicator to current header
+            headers[columnIndex].classList.add(asc ? 'asc' : 'desc');
+
+            // Sort the rows
+            const sortedRows = rows.sort((a, b) => {
+                const aCol = a.querySelectorAll('td')[columnIndex].textContent;
+                const bCol = b.querySelectorAll('td')[columnIndex].textContent;
+                
+                // Parse numbers (remove $ and % signs)
+                const aValue = parseFloat(aCol.replace(/[$%]/g, ''));
+                const bValue = parseFloat(bCol.replace(/[$%]/g, ''));
+                
+                if (!isNaN(aValue) && !isNaN(bValue)) {
+                    return asc ? aValue - bValue : bValue - aValue;
+                }
+                
+                return asc ? 
+                    aCol.localeCompare(bCol) : 
+                    bCol.localeCompare(aCol);
+            });
+
+            // Clear and re-append sorted rows
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
+            tbody.append(...sortedRows);
+        }
+
+        function createSortableTable(options, expiry) {
+            const table = document.createElement('table');
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th data-sort="text">Type</th>
+                        <th data-sort="number">Strike</th>
+                        <th data-sort="number">Current Price</th>
+                        <th data-sort="number">Theoretical Value</th>
+                        <th data-sort="number">Profit %</th>
+                        <th data-sort="number">Volume</th>
+                        <th data-sort="number">Implied Vol</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${options.map(opt => `
+                        <tr class="${opt.option_type}-row">
+                            <td><span class="option-type ${opt.option_type}">${opt.option_type.toUpperCase()}</span></td>
+                            <td>$${formatNumber(opt.strike)}</td>
+                            <td>$${formatNumber(opt.current_option_price)}</td>
+                            <td>$${formatNumber(opt.theoretical_value)}</td>
+                            <td class="${getColorClass(opt.profit_potential)}">${formatNumber(opt.profit_potential)}%</td>
+                            <td>${opt.volume}</td>
+                            <td>${formatNumber(opt.implied_volatility * 100)}%</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            `;
+
+            // Add click handlers for sorting
+            table.querySelectorAll('th').forEach((th, index) => {
+                th.addEventListener('click', () => {
+                    const isAsc = !th.classList.contains('asc');
+                    sortTable(table, index, isAsc);
+                });
+            });
+
+            // Initial sort by strike price
+            sortTable(table, 1, true);
+
+            return table;
+        }
+
+        function updateHighlightsTables() {
+            console.log('Updating highlights tables from existing data');
+            
+            const profitTableBody = document.querySelector('#profitTable tbody');
+            const valueTableBody = document.querySelector('#valueTable tbody');
+            
+            if (!profitTableBody || !valueTableBody) {
+                console.error('Could not find highlights table bodies');
+                return;
+            }
+
+            // Clear existing highlight tables
+            profitTableBody.innerHTML = '';
+            valueTableBody.innerHTML = '';
+
+            // Collect all options from existing scenario tables
+            const allOptions = [];
+            const scenarioTables = document.querySelectorAll('.scenario-section table tbody');
+            
+            scenarioTables.forEach(tbody => {
+                const rows = tbody.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 5) {  // Ensure we have enough cells
+                        const type = cells[0].textContent.trim();
+                        const strike = parseFloat(cells[1].textContent.replace('$', ''));
+                        // Get expiry from the nearest h3 header
+                        const expiry = row.closest('.scenario-section').querySelector('h3').textContent.replace('Options Expiring ', '');
+                        const currentPrice = parseFloat(cells[2].textContent.replace('$', ''));
+                        const profitPct = parseFloat(cells[4].textContent.replace('%', ''));
+                        
+                        allOptions.push({
+                            type: type,
+                            strike: strike,
+                            expiry: expiry,
+                            lastPrice: currentPrice,
+                            profit_potential: profitPct,
+                            value_ratio: profitPct / currentPrice
+                        });
+                    }
+                });
+            });
+
+            console.log('Collected options from tables:', allOptions);
+
+            if (allOptions.length === 0) {
+                const noDataMessage = '<tr><td colspan="5">No options data available</td></tr>';
+                profitTableBody.innerHTML = noDataMessage;
+                valueTableBody.innerHTML = noDataMessage;
+                return;
+            }
+
+            // Sort by profit potential (highest to lowest)
+            const byProfit = [...allOptions].sort((a, b) => b.profit_potential - a.profit_potential);
+            
+            // Sort by value ratio (highest to lowest)
+            const byValue = [...allOptions].sort((a, b) => b.value_ratio - a.value_ratio);
+
+            // Display top 10 profit options
+            byProfit.slice(0, 10).forEach(opt => {
+                const row = profitTableBody.insertRow();
+                row.innerHTML = `
+                    <td>${opt.type}</td>
+                    <td>${formatNumber(opt.strike)}</td>
+                    <td>${opt.expiry}</td>
+                    <td>$${formatNumber(opt.lastPrice)}</td>
+                    <td>${formatNumber(opt.profit_potential)}%</td>
+                `;
+            });
+
+            // Display top 10 value options
+            byValue.slice(0, 10).forEach(opt => {
+                const row = valueTableBody.insertRow();
+                row.innerHTML = `
+                    <td>${opt.type}</td>
+                    <td>${formatNumber(opt.strike)}</td>
+                    <td>${opt.expiry}</td>
+                    <td>$${formatNumber(opt.lastPrice)}</td>
+                    <td>${formatNumber(opt.value_ratio)}x</td>
+                `;
+            });
+        }
+
+        function displayResults(data) {
+            console.log('Received data in displayResults:', data);
+            
+            if (!data || !data.results) {
+                console.error('Invalid data format:', data);
+                alert('Invalid data format received from server');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            const summaryDiv = document.getElementById('summary');
+            const tableResultsDiv = document.getElementById('tableResults');
+
+            // Store the current data globally
+            currentData = data;
+
+            // Display summary
+            summaryDiv.innerHTML = `
+                <strong>Analysis for ${data.ticker}</strong><br>
+                Current Stock Price: $${formatNumber(data.current_price)}
+            `;
+
+            // Clear previous results
+            tableResultsDiv.innerHTML = '';
+
+            // Create and append tables for each price change scenario
+            Object.entries(data.results).forEach(([change, scenario]) => {
+                const scenarioDiv = document.createElement('div');
+                scenarioDiv.className = 'scenario-section';
+
+                const scenarioHeader = document.createElement('h2');
+                scenarioHeader.textContent = `Price Change: ${change}% (Stock Price: $${formatNumber(scenario.new_stock_price)})`;
+                scenarioDiv.appendChild(scenarioHeader);
+
+                // For each expiration date in this scenario
+                Object.entries(scenario.options_by_date).forEach(([expiry, options]) => {
+                    if (options.length === 0) return;
+
+                    const title = document.createElement('h3');
+                    title.textContent = `Options Expiring ${expiry}`;
+                    scenarioDiv.appendChild(title);
+
+                    const table = createSortableTable(options, expiry);
+                    scenarioDiv.appendChild(table);
+                });
+
+                tableResultsDiv.appendChild(scenarioDiv);
+            });
+
+            // After all tables are created and populated, update highlights
+            updateHighlightsTables();
+        }
+    </script>
+</body>
+</html>
