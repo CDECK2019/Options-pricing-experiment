@@ -268,14 +268,15 @@
             <div class="highlights-container">
                 <div class="highlight-table-container">
                     <h3>Highest Profit Potential Options</h3>
-                    <table id="profitTable">
+                    <table id="highestProfitTable">
                         <thead>
                             <tr>
-                                <th>Type</th>
                                 <th>Strike</th>
+                                <th>Type</th>
+                                <th>Cost</th>
+                                <th>Profit %</th>
                                 <th>Expiry</th>
-                                <th>Current Price</th>
-                                <th>Potential Profit</th>
+                                <th>Scenario</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -283,14 +284,15 @@
                 </div>
                 <div class="highlight-table-container">
                     <h3>Best Value Options</h3>
-                    <table id="valueTable">
+                    <table id="bestValueTable">
                         <thead>
                             <tr>
-                                <th>Type</th>
                                 <th>Strike</th>
+                                <th>Type</th>
+                                <th>Cost</th>
+                                <th>Profit/Cost</th>
                                 <th>Expiry</th>
-                                <th>Current Price</th>
-                                <th>Value Ratio</th>
+                                <th>Scenario</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -449,86 +451,90 @@
         }
 
         function updateHighlightsTables() {
-            console.log('Updating highlights tables from existing data');
-            
-            const profitTableBody = document.querySelector('#profitTable tbody');
-            const valueTableBody = document.querySelector('#valueTable tbody');
-            
-            if (!profitTableBody || !valueTableBody) {
-                console.error('Could not find highlights table bodies');
-                return;
-            }
+            if (!currentData || !currentData.results) return;
 
-            // Clear existing highlight tables
-            profitTableBody.innerHTML = '';
-            valueTableBody.innerHTML = '';
-
-            // Collect all options from existing scenario tables
-            const allOptions = [];
-            const scenarioTables = document.querySelectorAll('.scenario-section table tbody');
-            
-            scenarioTables.forEach(tbody => {
-                const rows = tbody.querySelectorAll('tr');
-                rows.forEach(row => {
-                    const cells = row.querySelectorAll('td');
-                    if (cells.length >= 5) {  // Ensure we have enough cells
-                        const type = cells[0].textContent.trim();
-                        const strike = parseFloat(cells[1].textContent.replace('$', ''));
-                        // Get expiry from the nearest h3 header
-                        const expiry = row.closest('.scenario-section').querySelector('h3').textContent.replace('Options Expiring ', '');
-                        const currentPrice = parseFloat(cells[2].textContent.replace('$', ''));
-                        const profitPct = parseFloat(cells[4].textContent.replace('%', ''));
+            // Collect all options across all scenarios and dates
+            let allOptions = [];
+            Object.entries(currentData.results).forEach(([change, scenario]) => {
+                Object.entries(scenario.options_by_date).forEach(([expiry, options]) => {
+                    options.forEach(option => {
+                        const optionType = option.option_type ? option.option_type.toUpperCase() : 'Unknown';
+                        const cost = option.current_option_price || 0;
+                        const profitPct = option.profit_potential || 0;
+                        
+                        // Calculate profit/cost ratio
+                        let profitCostRatio = 0;
+                        if (cost > 0) {
+                            profitCostRatio = profitPct / 100; // Convert percentage to ratio
+                        }
                         
                         allOptions.push({
-                            type: type,
-                            strike: strike,
+                            ...option,
+                            type: optionType,
+                            cost: cost,
+                            profitPct: profitPct,
+                            profitCostRatio: profitCostRatio,
+                            priceChange: change,
                             expiry: expiry,
-                            lastPrice: currentPrice,
-                            profit_potential: profitPct,
-                            value_ratio: profitPct / currentPrice
+                            newStockPrice: scenario.new_stock_price
                         });
-                    }
+                    });
                 });
             });
 
-            console.log('Collected options from tables:', allOptions);
+            // Sort by profit percentage
+            const sortedByProfit = [...allOptions].sort((a, b) => b.profitPct - a.profitPct);
+            const topProfitOptions = sortedByProfit.slice(0, 5);
 
-            if (allOptions.length === 0) {
-                const noDataMessage = '<tr><td colspan="5">No options data available</td></tr>';
-                profitTableBody.innerHTML = noDataMessage;
-                valueTableBody.innerHTML = noDataMessage;
-                return;
-            }
+            // Sort by profit/cost ratio
+            const sortedByValue = [...allOptions].sort((a, b) => b.profitCostRatio - a.profitCostRatio);
+            const topValueOptions = sortedByValue.slice(0, 5);
 
-            // Sort by profit potential (highest to lowest)
-            const byProfit = [...allOptions].sort((a, b) => b.profit_potential - a.profit_potential);
-            
-            // Sort by value ratio (highest to lowest)
-            const byValue = [...allOptions].sort((a, b) => b.value_ratio - a.value_ratio);
+            // Update highest profit potential table
+            const profitTable = document.getElementById('highestProfitTable');
+            profitTable.innerHTML = `
+                <tr>
+                    <th>Strike</th>
+                    <th>Type</th>
+                    <th>Cost</th>
+                    <th>Profit %</th>
+                    <th>Expiry</th>
+                    <th>Scenario</th>
+                </tr>
+                ${topProfitOptions.map(option => `
+                    <tr>
+                        <td>$${formatNumber(option.strike)}</td>
+                        <td>${option.type}</td>
+                        <td>$${formatNumber(option.cost)}</td>
+                        <td>${formatNumber(option.profitPct)}%</td>
+                        <td>${option.expiry}</td>
+                        <td>${formatNumber(parseFloat(option.priceChange))}% ($${formatNumber(option.newStockPrice)})</td>
+                    </tr>
+                `).join('')}
+            `;
 
-            // Display top 10 profit options
-            byProfit.slice(0, 10).forEach(opt => {
-                const row = profitTableBody.insertRow();
-                row.innerHTML = `
-                    <td>${opt.type}</td>
-                    <td>${formatNumber(opt.strike)}</td>
-                    <td>${opt.expiry}</td>
-                    <td>$${formatNumber(opt.lastPrice)}</td>
-                    <td>${formatNumber(opt.profit_potential)}%</td>
-                `;
-            });
-
-            // Display top 10 value options
-            byValue.slice(0, 10).forEach(opt => {
-                const row = valueTableBody.insertRow();
-                row.innerHTML = `
-                    <td>${opt.type}</td>
-                    <td>${formatNumber(opt.strike)}</td>
-                    <td>${opt.expiry}</td>
-                    <td>$${formatNumber(opt.lastPrice)}</td>
-                    <td>${formatNumber(opt.value_ratio)}x</td>
-                `;
-            });
+            // Update best value table
+            const valueTable = document.getElementById('bestValueTable');
+            valueTable.innerHTML = `
+                <tr>
+                    <th>Strike</th>
+                    <th>Type</th>
+                    <th>Cost</th>
+                    <th>Profit/Cost</th>
+                    <th>Expiry</th>
+                    <th>Scenario</th>
+                </tr>
+                ${topValueOptions.map(option => `
+                    <tr>
+                        <td>$${formatNumber(option.strike)}</td>
+                        <td>${option.type}</td>
+                        <td>$${formatNumber(option.cost)}</td>
+                        <td>${formatNumber(option.profitCostRatio)}x</td>
+                        <td>${option.expiry}</td>
+                        <td>${formatNumber(parseFloat(option.priceChange))}% ($${formatNumber(option.newStockPrice)})</td>
+                    </tr>
+                `).join('')}
+            `;
         }
 
         function displayResults(data) {
